@@ -317,6 +317,29 @@ HTML = """
     .footer { margin-top: 20px; padding: 14px; border-top: 1px solid #2a2d37; color: #8a8f98; font-size: 12px; line-height: 1.6; }
     .chips span { display: inline-block; background: #11141c; border: 1px solid #2a2d37; border-radius: 12px;
                   padding: 2px 10px; margin: 2px 4px 2px 0; color: #cfd6e4; font-size: 12px; }
+    .flow-wrap { background: #1a1d27; border: 1px solid #2a2d37; border-radius: 10px; padding: 18px 18px 14px; margin: 0 0 22px; }
+    .flow-wrap h2 { margin-bottom: 6px; }
+    .flow-lede { color: #cfd6e4; font-size: 14px; line-height: 1.5; max-width: 980px; margin-bottom: 14px; }
+    .flow-compare { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .lane { border-radius: 8px; padding: 12px; }
+    .lane.today { background: #1c1414; border: 1px solid #3a2222; }
+    .lane.now { background: #121c16; border: 1px solid #1e3a28; }
+    .lane-head { font-weight: 700; font-size: 13px; margin-bottom: 10px; letter-spacing: 0.02em; }
+    .lane.today .lane-head { color: #ff8a80; }
+    .lane.now .lane-head { color: #69f0ae; }
+    .steps { display: flex; flex-wrap: wrap; gap: 6px; align-items: stretch; }
+    .hop { background: #11141c; border: 1px solid #2a2d37; border-radius: 6px; padding: 8px 10px; min-width: 108px; flex: 1 1 108px; }
+    .hop .n { display: block; font-size: 10px; font-weight: 700; letter-spacing: 0.06em; color: #8a8f98; margin-bottom: 3px; }
+    .hop .t { display: block; font-size: 12px; color: #e8eaed; line-height: 1.3; }
+    .hop .d { display: block; font-size: 11px; color: #8a8f98; margin-top: 3px; }
+    .lane.now .hop.live { border-color: #4caf50; box-shadow: 0 0 0 1px #4caf50; }
+    .lane-end { margin-top: 10px; font-size: 13px; font-weight: 600; padding: 8px 10px; border-radius: 6px; }
+    .lane-end.bad { background: #2a1414; color: #ff8a80; }
+    .lane-end.good { background: #14351c; color: #69f0ae; }
+    .flow-caption { margin-top: 12px; color: #9aa0a6; font-size: 12px; line-height: 1.5; }
+    @media (max-width: 900px) {
+      .flow-compare, .kpis, .pillars, .grid { grid-template-columns: 1fr; }
+    }
   </style>
 </head>
 <body>
@@ -361,6 +384,50 @@ HTML = """
     <div class="pillar"><b>Protect the limit</b><p>Breaches are caught and sized the moment the weather changes. The desk no longer waits for the next risk run.</p></div>
     <div class="pillar"><b>Decide faster</b><p>Weather, cover, VaR and P&amp;L run as one chain. The hedge and the reroute economics are ready before the trader asks.</p></div>
     <div class="pillar"><b>Trust every number</b><p>Numbers come only from governed metric views and deterministic functions. AI explains them; it never invents them. Every decision is audited.</p></div>
+  </div>
+
+  <div class="flow-wrap">
+    <div class="eyebrow">The operating change</div>
+    <h2>Same North Sea storm. Two ways the desk works.</h2>
+    <div class="flow-lede">
+      The business value is not a faster chart. It is that after weather moves the market, the desk
+      <b>stops trading blind</b>. Today a storm means ~45 minutes of spreadsheets while Crude sits 2.11× over its limit.
+      On this desk the same event is ingested, repriced, explained and sized into a hedge the trader can approve — inside a 5-second budget (last live run updates the green lane).
+    </div>
+    <div class="flow-compare">
+      <div class="lane today">
+        <div class="lane-head">TODAY — ~45 minutes · desk is blind</div>
+        <div class="steps">
+          <div class="hop"><span class="n">1</span><span class="t">Storm alert on phone / email</span></div>
+          <div class="hop"><span class="n">2</span><span class="t">Pull weather, AIS, inventory into Excel</span></div>
+          <div class="hop"><span class="n">3</span><span class="t">Rebuild days of cover by hand</span></div>
+          <div class="hop"><span class="n">4</span><span class="t">Re-run VaR in a batch / local model</span></div>
+          <div class="hop"><span class="n">5</span><span class="t">Check limits in a second system</span></div>
+          <div class="hop"><span class="n">6</span><span class="t">Trader guesses a hedge size</span></div>
+          <div class="hop"><span class="n">7</span><span class="t">Risk signs off later</span></div>
+          <div class="hop"><span class="n">8</span><span class="t">Ops books the trade in ETRM</span></div>
+        </div>
+        <div class="lane-end bad">Outcome: hedge lands after the move. Exposure sits unpriced for ~45 min. No audit of why the size was chosen.</div>
+      </div>
+      <div class="lane now">
+        <div class="lane-head">THIS DESK — seconds · desk is current</div>
+        <div class="steps" id="live-hops">
+          <div class="hop" data-hop="ingest"><span class="n">1</span><span class="t">Storm reading lands</span><span class="d">Lakeflow + live trigger</span></div>
+          <div class="hop" data-hop="m1"><span class="n">2</span><span class="t">Weather → days of cover</span><span class="d">M1, warm model</span></div>
+          <div class="hop" data-hop="m2"><span class="n">3</span><span class="t">Cover → VaR change</span><span class="d">M2 · this hop is the increment, not book VaR</span></div>
+          <div class="hop" data-hop="m3"><span class="n">4</span><span class="t">VaR → limit utilisation</span><span class="d">M3 · is Crude still in breach?</span></div>
+          <div class="hop" data-hop="views"><span class="n">5</span><span class="t">Breach + P&amp;L by leg</span><span class="d">Governed metric views</span></div>
+          <div class="hop" data-hop="hedge"><span class="n">6</span><span class="t">Hedge + reroute sized</span><span class="d">UC functions, not the LLM</span></div>
+          <div class="hop" data-hop="ask"><span class="n">7</span><span class="t">Ask why, in English</span><span class="d">Genie, same numbers</span></div>
+          <div class="hop" data-hop="approve"><span class="n">8</span><span class="t">Trader approves</span><span class="d">Audit written · ETRM still executes</span></div>
+        </div>
+        <div class="lane-end good" id="live-end">Outcome: Crude can be put back inside the limit while the storm is still in the tape. Every number is governed. Every decision is audited.</div>
+      </div>
+    </div>
+    <div class="flow-caption">
+      Press <b>Run storm reprice</b> below to fire steps 1–4 live. Then <b>Get recommendation</b> for step 6 and <b>Ask the desk</b> for step 7.
+      The −$3 (or similar) on the reprice card is the model increment from this weather reading — not the $8.45M book VaR in Step 1.
+    </div>
   </div>
 
   <div class="grid">
@@ -480,6 +547,8 @@ HTML = """
       phtml += '</table>';
       document.getElementById('pnl-table').innerHTML = phtml;
 
+      const viewsHop = document.querySelector('#live-hops .hop[data-hop="views"]');
+      if (viewsHop) viewsHop.classList.add('live');
       const t = document.getElementById('situation-takeaway');
       if (breach) {
         t.innerHTML = `<b>${breach.sub_book} is ${fmtX(breach.limit_utilisation)} its VaR limit</b>, which is ${fmtUSD(Number(breach.var_95_usd) - Number(breach.limit_usd))} over. ` +
@@ -493,8 +562,14 @@ HTML = """
     async function triggerChain() {
       const btn = document.getElementById('chain-btn');
       btn.disabled = true;
+      document.querySelectorAll('#live-hops .hop').forEach(h => h.classList.remove('live'));
+      ['ingest','m1','m2','m3'].forEach(id => {
+        const el = document.querySelector('#live-hops .hop[data-hop="'+id+'"]');
+        if (el) el.classList.add('live');
+      });
+      document.getElementById('live-end').textContent = 'RUNNING — weather is moving through M1 → M2 → M3. Wait for COMPLETE on the card to the right.';
       document.getElementById('chain-result').innerHTML =
-        '<div class="takeaway"><span class="state state-run">RUNNING</span>Repricing on the new weather reading. It is not finished until you see COMPLETE.</div>';
+        '<div class="takeaway"><span class="state state-run">RUNNING</span>Repricing on the new weather reading. It is not finished until you see COMPLETE. This is steps 1–4 of the green lane.</div>';
       try {
         const r = await fetch('/api/trigger');
         const d = await r.json();
@@ -509,8 +584,10 @@ HTML = """
         const ms = b.total_ms, budget = d.budget_ms || 5000;
         const secs = (ms / 1000).toFixed(2);
         const pct = Math.min(100, (ms / budget) * 100);
+        document.getElementById('live-end').innerHTML =
+          `COMPLETE — steps 1–4 just ran in <b>${secs} s</b>. Today that spreadsheet rebuild is ~45 minutes, and the desk is blind for all of it. Next: Get recommendation (step 6).`;
         let html = `<div class="takeaway good"><span class="state state-ok">COMPLETE</span>` +
-          `<b>Book repriced in ${secs} s</b> (budget is 5 s). The manual rebuild takes about 45 minutes today.</div>`;
+          `<b>Book repriced in ${secs} s</b>. That replaced today's ~45 min Excel rebuild (red lane, steps 2–5). The desk is no longer blind.</div>`;
         html += '<table>';
         html += `<tr><td>Supply cover after the storm</td><td><b>${Number(m1.days_of_cover).toFixed(1)} days</b></td></tr>`;
         html += `<tr><td>Change in VaR from this reading</td><td><b>${fmtUSD(Number(m2.var_delta_usd))}</b></td></tr>`;
@@ -538,7 +615,9 @@ HTML = """
       if (!q) return;
       const el = document.getElementById('genie-answer');
       el.className = '';
-      el.innerHTML = '<span class="state state-run">THINKING</span>Genie is querying the governed views…';
+      const askHop = document.querySelector('#live-hops .hop[data-hop="ask"]');
+      if (askHop) askHop.classList.add('live');
+      el.innerHTML = '<span class="state state-run">THINKING</span>Genie is querying the governed views… (step 7 of the green lane)';
       const r = await fetch('/api/ask?q=' + encodeURIComponent(q));
       const d = await r.json();
       if (d.error && String(d.error).includes('403')) {
@@ -551,8 +630,10 @@ HTML = """
     async function loadDecision() {
       const btn = document.getElementById('decision-btn');
       btn.disabled = true;
+      const hedgeHop = document.querySelector('#live-hops .hop[data-hop="hedge"]');
+      if (hedgeHop) hedgeHop.classList.add('live');
       document.getElementById('decision-result').innerHTML =
-        '<div class="takeaway"><span class="state state-run">LOADING</span>Sizing the hedge and writing the summary. Wait for COMPLETE.</div>';
+        '<div class="takeaway"><span class="state state-run">LOADING</span>Sizing the hedge and writing the summary. Wait for COMPLETE. This is step 6 of the green lane.</div>';
       try {
         const r = await fetch('/api/decision');
         const d = await r.json();
@@ -585,6 +666,8 @@ HTML = """
     async function decide(action) {
       const r = await fetch('/api/decision/approve?action=' + action, {method: 'POST'});
       const d = await r.json();
+      const approveHop = document.querySelector('#live-hops .hop[data-hop="approve"]');
+      if (approveHop) approveHop.classList.add('live');
       document.getElementById('decision-ack').innerHTML =
         `<div class="takeaway ${action === 'APPROVE' ? 'good' : 'bad'}"><span class="state ${action === 'APPROVE' ? 'state-ok' : 'state-fail'}">${d.action}</span>` +
         `Recorded in the audit trail by ${d.who} (decision ${String(d.decision_id).slice(0, 8)}). Next step: book the trade in the ETRM.</div>`;
