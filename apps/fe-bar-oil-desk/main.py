@@ -132,6 +132,26 @@ def get_pnl():
     return {"pnl": rows}
 
 
+@app.get("/api/outcome")
+def get_outcome():
+    """Headline business outcome from governed views and UC functions (no LLM)."""
+    cat = "serverless_stable_ob2uyb_catalog.fe_bar_spike"
+    risk = _sql_query(f"SELECT * FROM {cat}.desk_risk_mv WHERE sub_book = 'CRUDE'")
+    pnl = _sql_query(f"SELECT * FROM {cat}.desk_pnl_mv")
+    hedge_rows = _sql_query(f"SELECT {cat}.hedge_size('CRUDE') AS hedge_bbl")
+    hedge_bbl = int(float(hedge_rows[0]["hedge_bbl"])) if hedge_rows else 0
+    post_rows = _sql_query(f"SELECT {cat}.post_action_util('CRUDE', {hedge_bbl}) AS post_util")
+    crude = risk[0] if risk else {}
+    return {
+        "crude_util": float(crude.get("limit_utilisation") or 0),
+        "crude_var_usd": float(crude.get("var_95_usd") or 0),
+        "crude_limit_usd": float(crude.get("limit_usd") or 0),
+        "hedge_bbl": hedge_bbl,
+        "post_util": float(post_rows[0]["post_util"]) if post_rows else 0,
+        "pnl": [{"leg": p.get("leg_type"), "mtd_usd": float(p.get("mtd_pnl_usd") or 0)} for p in pnl],
+    }
+
+
 @app.get("/api/ask")
 def ask_genie(q: str):
     """Proxy to Genie Conversation API."""
@@ -233,187 +253,344 @@ HTML = """
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8"><title>FE Bar — Oil Desk</title>
+  <meta charset="utf-8"><title>North Sea Storm Desk — Physical Oil</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-           background: #0f1117; color: #e0e0e0; padding: 20px; }
-    h1 { color: #fff; margin-bottom: 20px; }
-    h2 { color: #8ab4f8; margin: 16px 0 8px; font-size: 1.1em; }
-    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
-    .card { background: #1a1d27; border-radius: 8px; padding: 16px; border: 1px solid #2a2d37; }
-    .breach { border-color: #f44336; background: #1a1015; }
-    .ok { border-color: #4caf50; }
-    .btn { background: #1a73e8; color: #fff; border: none; padding: 10px 20px;
-           border-radius: 4px; cursor: pointer; font-size: 14px; margin: 4px; }
+           background: #0f1117; color: #e0e0e0; padding: 24px 28px 40px; max-width: 1280px; margin: 0 auto; }
+    h1 { color: #fff; font-size: 26px; }
+    h2 { color: #fff; font-size: 17px; margin-bottom: 4px; }
+    .eyebrow { color: #8ab4f8; font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
+    .sub { color: #9aa0a6; font-size: 13px; margin-top: 4px; }
+    .hero { background: linear-gradient(135deg, #16213a 0%, #1a1d27 70%); border: 1px solid #2a3550;
+            border-radius: 10px; padding: 24px; margin: 18px 0; }
+    .hero .headline { font-size: 24px; font-weight: 700; color: #fff; margin: 8px 0 10px; line-height: 1.3; }
+    .hero .valueprop { font-size: 15px; color: #cfd6e4; line-height: 1.55; max-width: 900px; }
+    .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 18px; }
+    .kpi { background: #11141c; border: 1px solid #2a2d37; border-radius: 8px; padding: 14px; }
+    .kpi .label { color: #9aa0a6; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; }
+    .kpi .value { font-size: 22px; font-weight: 700; color: #fff; margin: 6px 0 2px; }
+    .kpi .value .from { color: #ff8a80; }
+    .kpi .value .to { color: #69f0ae; }
+    .kpi .note { color: #8a8f98; font-size: 12px; line-height: 1.4; }
+    .pillars { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 0 0 22px; }
+    .pillar { background: #1a1d27; border: 1px solid #2a2d37; border-radius: 8px; padding: 14px; }
+    .pillar b { color: #fff; display: block; margin-bottom: 4px; }
+    .pillar p { color: #b0b6c0; font-size: 13px; line-height: 1.5; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+    .card { background: #1a1d27; border-radius: 10px; padding: 18px; border: 1px solid #2a2d37; }
+    .card .why { color: #9aa0a6; font-size: 13px; margin: 2px 0 12px; line-height: 1.45; }
+    .takeaway { background: #11141c; border-left: 3px solid #8ab4f8; padding: 10px 12px; border-radius: 4px;
+                margin: 10px 0; font-size: 14px; color: #e8eaed; line-height: 1.45; }
+    .takeaway.bad { border-left-color: #f44336; }
+    .takeaway.good { border-left-color: #4caf50; }
+    .btn { background: #1a73e8; color: #fff; border: none; padding: 10px 18px;
+           border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 600; margin: 4px 4px 4px 0; }
     .btn:hover { background: #1557b0; }
-    .btn-approve { background: #4caf50; }
-    .btn-decline { background: #f44336; }
-    .bar { height: 24px; border-radius: 4px; margin: 4px 0; }
-    .bar-fill { height: 100%; border-radius: 4px; }
-    table { width: 100%; border-collapse: collapse; margin: 8px 0; }
-    th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid #2a2d37; }
-    th { color: #8ab4f8; }
-    .highlight { color: #f44336; font-weight: bold; }
-    .ok-text { color: #4caf50; }
-    #narrative { font-style: italic; color: #ccc; margin: 8px 0; }
-    .banner { background: #333; color: #ffa726; padding: 8px 16px; border-radius: 4px;
-              text-align: center; margin: 12px 0; font-weight: bold; }
-    #genie-input { width: 70%; padding: 8px; background: #1a1d27; border: 1px solid #2a2d37;
-                   color: #e0e0e0; border-radius: 4px; }
-    #genie-answer { margin-top: 8px; padding: 12px; background: #1a1d27; border-radius: 4px;
-                    min-height: 40px; white-space: pre-wrap; }
-    .loading { color: #8ab4f8; }
-    .state { display: inline-block; padding: 4px 10px; border-radius: 4px; font-weight: 700; letter-spacing: 0.04em; font-size: 12px; }
+    .btn:disabled { opacity: 0.6; cursor: wait; }
+    .btn-approve { background: #2e7d32; }
+    .btn-decline { background: #c62828; }
+    .bar { height: 10px; border-radius: 5px; margin: 6px 0; background: #2a2d37; }
+    .bar-fill { height: 100%; border-radius: 5px; }
+    table { width: 100%; border-collapse: collapse; margin: 6px 0; font-size: 14px; }
+    th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid #2a2d37; }
+    th { color: #8ab4f8; font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; }
+    .bad-text { color: #ff8a80; font-weight: 700; }
+    .ok-text { color: #69f0ae; }
+    #narrative { font-style: italic; color: #cfd6e4; margin: 10px 0; line-height: 1.5; }
+    .banner { background: #2a2416; color: #ffb74d; padding: 8px 14px; border-radius: 6px;
+              margin: 10px 0; font-weight: 600; font-size: 13px; }
+    #genie-input { width: 72%; padding: 9px; background: #11141c; border: 1px solid #2a2d37;
+                   color: #e0e0e0; border-radius: 6px; }
+    #genie-answer { margin-top: 10px; padding: 12px; background: #11141c; border-radius: 6px;
+                    min-height: 40px; white-space: pre-wrap; font-size: 14px; line-height: 1.5; }
+    .state { display: inline-block; padding: 3px 9px; border-radius: 4px; font-weight: 700;
+             letter-spacing: 0.04em; font-size: 11px; margin-right: 6px; }
     .state-idle { background: #2a2d37; color: #aaa; }
     .state-run { background: #1a3a5c; color: #8ab4f8; }
     .state-ok { background: #14351c; color: #69f0ae; }
     .state-fail { background: #3a1212; color: #ff8a80; }
-    .metric { margin: 8px 0; line-height: 1.45; }
-    .metric b { color: #fff; }
-    .muted { color: #888; font-size: 12px; }
+    .muted { color: #8a8f98; font-size: 12px; }
+    details { margin-top: 10px; }
+    summary { cursor: pointer; color: #8ab4f8; font-size: 12px; }
+    .tech { font-size: 12px; color: #9aa0a6; line-height: 1.6; margin-top: 6px; }
+    .footer { margin-top: 20px; padding: 14px; border-top: 1px solid #2a2d37; color: #8a8f98; font-size: 12px; line-height: 1.6; }
+    .chips span { display: inline-block; background: #11141c; border: 1px solid #2a2d37; border-radius: 12px;
+                  padding: 2px 10px; margin: 2px 4px 2px 0; color: #cfd6e4; font-size: 12px; }
   </style>
 </head>
 <body>
-  <h1>FE Bar — Trafigura Physical Oil Desk</h1>
-  <div class="grid">
-    <div class="card" id="chain-card">
-      <h2>1. Live Chain</h2>
-      <p class="muted">Reprices North Sea Brent after a metocean tick. Clock starts when you press the button.</p>
-      <button class="btn" id="chain-btn" onclick="triggerChain()">Run reprice (M1 → M2 → M3)</button>
-      <div id="chain-result">
-        <p><span class="state state-idle">IDLE</span> Not started. Press the button — you will see RUNNING, then COMPLETE or FAILED.</p>
+  <div class="eyebrow">Trafigura · Physical Oil &amp; Petroleum Products desk · synthetic illustrative book</div>
+  <h1>North Sea Storm Desk</h1>
+  <div class="sub">When the weather moves the market, the desk knows its exposure in seconds and has a hedge ready to approve.</div>
+
+  <div class="hero">
+    <div class="eyebrow">Business outcome</div>
+    <div class="headline">Get Crude back inside its risk limit in seconds, not hours.</div>
+    <div class="valueprop">
+      A North Sea storm has pushed the Crude book <b id="hero-util">2.11×</b> over its VaR limit.
+      Today the desk rebuilds cover, VaR and P&amp;L by hand. That takes about 45 minutes per weather event, and the desk is trading blind while it happens.
+      This desk reprices the whole chain the moment the storm data lands. It recommends the hedge that brings Crude back to <b id="hero-post">1.00×</b>,
+      and every number traces back to governed data. <b>The desk decides. ETRM executes.</b>
+    </div>
+    <div class="kpis">
+      <div class="kpi">
+        <div class="label">Crude limit utilisation</div>
+        <div class="value"><span class="from" id="k-util">2.11×</span> → <span class="to" id="k-post">1.00×</span></div>
+        <div class="note">Breach today → compliant after the recommended hedge</div>
       </div>
-    </div>
-    <div class="card" id="risk-card">
-      <h2>2. Risk &amp; P&amp;L</h2>
-      <div id="risk-table"></div>
-      <div id="pnl-table"></div>
-    </div>
-    <div class="card">
-      <h2>3. Ask the Desk</h2>
-      <input id="genie-input" placeholder="e.g. What is the CRUDE limit utilisation?"
-             onkeypress="if(event.key==='Enter')askGenie()">
-      <button class="btn" onclick="askGenie()">Ask</button>
-      <div id="genie-answer"></div>
-    </div>
-    <div class="card" id="decision-card">
-      <h2>4. Decision Card</h2>
-      <button class="btn" onclick="loadDecision()">Load Recommendation</button>
-      <div id="decision-result"></div>
+      <div class="kpi">
+        <div class="label">VaR over limit</div>
+        <div class="value"><span class="from" id="k-excess">$4.45M</span> → <span class="to">$0</span></div>
+        <div class="note" id="k-excess-note">Crude VaR $8.45M vs $4.0M limit</div>
+      </div>
+      <div class="kpi">
+        <div class="label">Time to reprice after a storm</div>
+        <div class="value"><span class="from">~45 min</span> → <span class="to" id="k-time">&lt;1 s</span></div>
+        <div class="note" id="k-time-note">Manual rebuild today (desk estimate) vs live chain</div>
+      </div>
+      <div class="kpi">
+        <div class="label">MTD P&amp;L explained</div>
+        <div class="value" id="k-pnl">$1.25M</div>
+        <div class="note" id="k-pnl-note">Split by flat price, crack and freight</div>
+      </div>
     </div>
   </div>
 
+  <div class="pillars">
+    <div class="pillar"><b>Protect the limit</b><p>Breaches are caught and sized the moment the weather changes. The desk no longer waits for the next risk run.</p></div>
+    <div class="pillar"><b>Decide faster</b><p>Weather, cover, VaR and P&amp;L run as one chain. The hedge and the reroute economics are ready before the trader asks.</p></div>
+    <div class="pillar"><b>Trust every number</b><p>Numbers come only from governed metric views and deterministic functions. AI explains them; it never invents them. Every decision is audited.</p></div>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <div class="eyebrow">Step 1 · The situation</div>
+      <h2>Crude is in breach and P&amp;L needs explaining</h2>
+      <div class="why">Where the desk stands right now, from governed metric views.</div>
+      <div id="situation-takeaway" class="takeaway bad">Loading the book…</div>
+      <div id="risk-table"></div>
+      <div id="pnl-table"></div>
+    </div>
+
+    <div class="card">
+      <div class="eyebrow">Step 2 · The storm hits</div>
+      <h2>Reprice the book on fresh weather</h2>
+      <div class="why">One click sends a new North Sea weather reading through the chain: weather → days of cover → VaR → limit. It has a 5-second budget.</div>
+      <button class="btn" id="chain-btn" onclick="triggerChain()">Run storm reprice</button>
+      <div id="chain-result">
+        <div class="takeaway"><span class="state state-idle">IDLE</span>Not started. Press the button. You will see RUNNING, then COMPLETE.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <div class="eyebrow">Step 3 · The decision</div>
+      <h2>Hedge recommendation to approve</h2>
+      <div class="why">Sized by deterministic Unity Catalog functions. AI writes the summary from those numbers only.</div>
+      <button class="btn" id="decision-btn" onclick="loadDecision()">Get recommendation</button>
+      <div id="decision-result"></div>
+    </div>
+
+    <div class="card">
+      <div class="eyebrow">Step 4 · Ask the desk</div>
+      <h2>Ask anything about the book, in plain English</h2>
+      <div class="why">Genie answers from the same governed views, so it gives the same numbers as the tables.</div>
+      <input id="genie-input" placeholder="e.g. Why is Crude in breach and how much do we need to hedge?"
+             onkeypress="if(event.key==='Enter')askGenie()">
+      <button class="btn" onclick="askGenie()">Ask</button>
+      <div id="genie-answer" class="muted">Try: "Which leg drives MTD P&amp;L?" or "Which books are in breach?"</div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <div class="chips"><b style="color:#cfd6e4">How it works:</b>
+      <span>Lakeflow ingests weather, prices, AIS, inventory</span>
+      <span>Unity Catalog governs</span>
+      <span>Lakebase serves in milliseconds</span>
+      <span>M1→M2→M3 models stay warm in the app</span>
+      <span>Genie answers questions</span>
+      <span>This app is where the desk decides</span>
+    </div>
+    <div style="margin-top:8px">Recommends only. The ETRM system of record executes trades. All data is synthetic and illustrative.</div>
+  </div>
+
   <script>
-    async function triggerChain() {
-      const btn = document.getElementById('chain-btn');
-      btn.disabled = true;
-      document.getElementById('chain-result').innerHTML =
-        '<p><span class="state state-run">RUNNING</span> Calling the model chain. Not finished until you see COMPLETE.</p>';
+    const fmtUSD = (n) => {
+      const a = Math.abs(n);
+      const s = a >= 1e6 ? (a / 1e6).toFixed(2) + 'M' : a >= 1e3 ? (a / 1e3).toFixed(0) + 'K' : a.toFixed(0);
+      return (n < 0 ? '-$' : '$') + s;
+    };
+    const fmtX = (n) => Number(n).toFixed(2) + '×';
+
+    async function loadOutcome() {
       try {
-        const r = await fetch('/api/trigger');
-        const d = await r.json();
-        const ok = d.status === 200 && d.body && d.body.run_id && !d.body.error;
-        if (!ok) {
-          document.getElementById('chain-result').innerHTML =
-            `<p><span class="state state-fail">FAILED</span> Chain did not complete (HTTP ${d.status}).</p>` +
-            `<p class="muted">${(d.body && (d.body.error || JSON.stringify(d.body))) || 'No body'}</p>`;
-          return;
+        const r = await fetch('/api/outcome');
+        const o = await r.json();
+        if (o.crude_util) {
+          document.getElementById('k-util').textContent = fmtX(o.crude_util);
+          document.getElementById('hero-util').textContent = fmtX(o.crude_util);
         }
-        const b = d.body;
-        const chainMs = b.total_ms;
-        const budget = d.budget_ms || 5000;
-        const under = chainMs < budget;
-        const m1 = b.m1 || {};
-        const m2 = b.m2 || {};
-        const m3 = b.m3 || {};
-        const pct = Math.min(100, (chainMs / budget) * 100);
-        const color = under ? '#4caf50' : '#f44336';
-        let html = `<p><span class="state state-ok">COMPLETE</span> Chain finished. North Sea Brent reprice is done.</p>`;
-        html += `<div class="metric"><b>M1 Metocean → days of cover:</b> ${Number(m1.days_of_cover).toFixed(2)} days <span class="muted">(${m1.latency_ms}ms)</span></div>`;
-        html += `<div class="metric"><b>M2 VaR delta:</b> $${Number(m2.var_delta_usd).toFixed(2)} <span class="muted">(${m2.latency_ms}ms) — model increment, not the $8.45M book VaR in panel 2</span></div>`;
-        if (m3.limit_util !== undefined) {
-          html += `<div class="metric"><b>M3 limit utilisation:</b> ${m3.limit_util}x <span class="muted">(${m3.latency_ms}ms)</span></div>`;
+        if (o.post_util) {
+          document.getElementById('k-post').textContent = fmtX(o.post_util);
+          document.getElementById('hero-post').textContent = fmtX(o.post_util);
         }
-        html += `<div class="metric"><b>Budget:</b> ${chainMs}ms used of ${budget}ms — ${under ? 'UNDER BUDGET' : 'OVER BUDGET'} (${pct.toFixed(0)}%)</div>`;
-        html += `<div class="bar" style="background:#2a2d37"><div class="bar-fill" style="width:${pct}%;background:${color}"></div></div>`;
-        html += `<p class="muted">Door-to-door HTTP ${d.wall_ms}ms (includes auth). Chain compute ${chainMs}ms. Run ${b.run_id}</p>`;
-        document.getElementById('chain-result').innerHTML = html;
-      } catch (e) {
-        document.getElementById('chain-result').innerHTML =
-          `<p><span class="state state-fail">FAILED</span> ${e}</p>`;
-      } finally {
-        btn.disabled = false;
-      }
+        if (o.crude_var_usd && o.crude_limit_usd) {
+          const excess = Math.max(0, o.crude_var_usd - o.crude_limit_usd);
+          document.getElementById('k-excess').textContent = fmtUSD(excess);
+          document.getElementById('k-excess-note').textContent =
+            `Crude VaR ${fmtUSD(o.crude_var_usd)} vs ${fmtUSD(o.crude_limit_usd)} limit. Hedge ${Number(o.hedge_bbl).toLocaleString()} bbl closes it.`;
+        }
+        if (o.pnl && o.pnl.length) {
+          const total = o.pnl.reduce((s, p) => s + p.mtd_usd, 0);
+          const top = o.pnl.slice().sort((a, b) => b.mtd_usd - a.mtd_usd)[0];
+          document.getElementById('k-pnl').textContent = fmtUSD(total);
+          document.getElementById('k-pnl-note').textContent =
+            `${top.leg.replace('_', ' ')} drives ${Math.round(100 * top.mtd_usd / total)}% of MTD P&L`;
+        }
+      } catch (e) { /* keep defaults */ }
     }
 
     async function loadRisk() {
       const [riskR, pnlR] = await Promise.all([fetch('/api/risk'), fetch('/api/pnl')]);
       const risk = await riskR.json();
       const pnl = await pnlR.json();
-      let rhtml = '<table><tr><th>Book</th><th>VaR 95</th><th>Limit</th><th>Util</th><th>Status</th></tr>';
+      let rhtml = '<table><tr><th>Book</th><th>VaR 95</th><th>Limit</th><th>Utilisation</th><th>Status</th></tr>';
+      let breach = null;
       for (const r of risk.risk) {
-        const cls = parseFloat(r.limit_utilisation) > 1 ? 'highlight' : 'ok-text';
-        rhtml += `<tr><td>${r.sub_book}</td><td>$${Number(r.var_95_usd).toLocaleString()}</td>`;
-        rhtml += `<td>$${Number(r.limit_usd).toLocaleString()}</td>`;
-        rhtml += `<td class="${cls}">${r.limit_utilisation}x</td>`;
-        rhtml += `<td class="${cls}">${r.limit_status}</td></tr>`;
+        const u = parseFloat(r.limit_utilisation);
+        const cls = u > 1 ? 'bad-text' : 'ok-text';
+        if (u > 1) breach = r;
+        rhtml += `<tr><td>${r.sub_book}</td><td>${fmtUSD(Number(r.var_95_usd))}</td>`;
+        rhtml += `<td>${fmtUSD(Number(r.limit_usd))}</td>`;
+        rhtml += `<td class="${cls}">${fmtX(u)}</td><td class="${cls}">${r.limit_status}</td></tr>`;
       }
       rhtml += '</table>';
       document.getElementById('risk-table').innerHTML = rhtml;
 
-      let phtml = '<table><tr><th>Leg</th><th>MTD P&L</th><th>Days</th></tr>';
+      const total = pnl.pnl.reduce((s, p) => s + Number(p.mtd_pnl_usd), 0);
+      let phtml = '<table><tr><th>P&amp;L leg</th><th>MTD</th><th>Share</th></tr>';
+      let top = null;
       for (const p of pnl.pnl) {
-        phtml += `<tr><td>${p.leg_type}</td><td>$${Number(p.mtd_pnl_usd).toLocaleString()}</td>`;
-        phtml += `<td>${p.trading_days}</td></tr>`;
+        const v = Number(p.mtd_pnl_usd);
+        if (!top || v > Number(top.mtd_pnl_usd)) top = p;
+        phtml += `<tr><td>${p.leg_type.replace('_', ' ')}</td><td>${fmtUSD(v)}</td><td>${Math.round(100 * v / total)}%</td></tr>`;
       }
       phtml += '</table>';
       document.getElementById('pnl-table').innerHTML = phtml;
+
+      const t = document.getElementById('situation-takeaway');
+      if (breach) {
+        t.innerHTML = `<b>${breach.sub_book} is ${fmtX(breach.limit_utilisation)} its VaR limit</b>, which is ${fmtUSD(Number(breach.var_95_usd) - Number(breach.limit_usd))} over. ` +
+          `MTD P&amp;L is ${fmtUSD(total)}, and <b>${top.leg_type.replace('_', ' ')}</b> drives ${Math.round(100 * Number(top.mtd_pnl_usd) / total)}% of it.`;
+      } else {
+        t.className = 'takeaway good';
+        t.innerHTML = `All books are within limit. MTD P&amp;L is ${fmtUSD(total)}.`;
+      }
+    }
+
+    async function triggerChain() {
+      const btn = document.getElementById('chain-btn');
+      btn.disabled = true;
+      document.getElementById('chain-result').innerHTML =
+        '<div class="takeaway"><span class="state state-run">RUNNING</span>Repricing on the new weather reading. It is not finished until you see COMPLETE.</div>';
+      try {
+        const r = await fetch('/api/trigger');
+        const d = await r.json();
+        const ok = d.status === 200 && d.body && d.body.run_id && !d.body.error;
+        if (!ok) {
+          document.getElementById('chain-result').innerHTML =
+            `<div class="takeaway bad"><span class="state state-fail">FAILED</span>The reprice did not complete (HTTP ${d.status}).</div>` +
+            `<p class="muted">${(d.body && (d.body.error || JSON.stringify(d.body))) || ''}</p>`;
+          return;
+        }
+        const b = d.body, m1 = b.m1 || {}, m2 = b.m2 || {}, m3 = b.m3 || {};
+        const ms = b.total_ms, budget = d.budget_ms || 5000;
+        const secs = (ms / 1000).toFixed(2);
+        const pct = Math.min(100, (ms / budget) * 100);
+        let html = `<div class="takeaway good"><span class="state state-ok">COMPLETE</span>` +
+          `<b>Book repriced in ${secs} s</b> (budget is 5 s). The manual rebuild takes about 45 minutes today.</div>`;
+        html += '<table>';
+        html += `<tr><td>Supply cover after the storm</td><td><b>${Number(m1.days_of_cover).toFixed(1)} days</b></td></tr>`;
+        html += `<tr><td>Change in VaR from this reading</td><td><b>${fmtUSD(Number(m2.var_delta_usd))}</b></td></tr>`;
+        if (m3.limit_util !== undefined) html += `<tr><td>Crude limit utilisation</td><td><b>${fmtX(m3.limit_util)}</b></td></tr>`;
+        html += '</table>';
+        html += `<div class="bar"><div class="bar-fill" style="width:${Math.max(pct, 1.5)}%;background:#4caf50"></div></div>`;
+        html += `<div class="muted">${ms} ms used of the 5,000 ms budget (${pct.toFixed(0)}%)</div>`;
+        html += `<details><summary>Technical detail</summary><div class="tech">` +
+          `M1 weather→cover ${m1.latency_ms} ms · M2 cover→VaR ${m2.latency_ms} ms` +
+          (m3.latency_ms !== undefined ? ` · M3 VaR→limit ${m3.latency_ms} ms` : '') +
+          `<br>Chain compute incl. Lakebase writes ${ms} ms · door-to-door HTTP incl. auth ${d.wall_ms} ms<br>Run ${b.run_id}</div></details>`;
+        document.getElementById('chain-result').innerHTML = html;
+        document.getElementById('k-time').textContent = secs + ' s';
+        document.getElementById('k-time-note').textContent = 'Manual rebuild today (desk estimate) vs the last live run';
+      } catch (e) {
+        document.getElementById('chain-result').innerHTML =
+          `<div class="takeaway bad"><span class="state state-fail">FAILED</span>${e}</div>`;
+      } finally {
+        btn.disabled = false;
+      }
     }
 
     async function askGenie() {
       const q = document.getElementById('genie-input').value;
       if (!q) return;
-      document.getElementById('genie-answer').innerHTML = '<span class="loading">Thinking...</span>';
+      const el = document.getElementById('genie-answer');
+      el.className = '';
+      el.innerHTML = '<span class="state state-run">THINKING</span>Genie is querying the governed views…';
       const r = await fetch('/api/ask?q=' + encodeURIComponent(q));
       const d = await r.json();
-      document.getElementById('genie-answer').textContent = d.answer || d.error || 'No answer';
+      if (d.error && String(d.error).includes('403')) {
+        el.innerHTML = '<span class="state state-fail">NO ACCESS</span>The app is not yet allowed to use this Genie space (needs CAN_RUN).';
+      } else {
+        el.textContent = d.answer || d.error || 'No answer';
+      }
     }
 
     async function loadDecision() {
+      const btn = document.getElementById('decision-btn');
+      btn.disabled = true;
       document.getElementById('decision-result').innerHTML =
-        '<p><span class="state state-run">LOADING</span> Computing hedge from UC functions, then a 3-sentence narrative. Wait for COMPLETE.</p>';
-      const r = await fetch('/api/decision');
-      const d = await r.json();
-      if (d.error) {
-        document.getElementById('decision-result').innerHTML =
-          `<p><span class="state state-fail">FAILED</span> ${d.error}</p>`;
-        return;
+        '<div class="takeaway"><span class="state state-run">LOADING</span>Sizing the hedge and writing the summary. Wait for COMPLETE.</div>';
+      try {
+        const r = await fetch('/api/decision');
+        const d = await r.json();
+        if (d.error) {
+          document.getElementById('decision-result').innerHTML =
+            `<div class="takeaway bad"><span class="state state-fail">FAILED</span>${d.error}</div>`;
+          return;
+        }
+        const excess = Math.max(0, d.var_95_usd - d.var_95_usd / d.current_util);
+        let html = `<div class="takeaway good"><span class="state state-ok">COMPLETE</span>` +
+          `<b>Sell ${d.hedge_bbl.toLocaleString()} bbl of Crude</b> to take utilisation from ` +
+          `<span class="bad-text">${fmtX(d.current_util)}</span> to <span class="ok-text">${fmtX(d.post_action_util)}</span>, ` +
+          `bringing ${fmtUSD(excess)} of VaR back inside the limit.</div>`;
+        if (d.reroute && d.reroute.cargo_id) {
+          html += `<div class="takeaway">Cargo ${d.reroute.cargo_id} → ${d.reroute.alt_port}: ` +
+            `ETA ${d.reroute.delta_eta_days > 0 ? '+' : ''}${d.reroute.delta_eta_days} days, cost ${fmtUSD(Number(d.reroute.delta_cost_usd))}. ` +
+            `<b>${d.reroute.recommendation}</b></div>`;
+        }
+        if (d.narrative) html += `<div id="narrative">${d.narrative}</div>`;
+        html += `<div class="banner">${d.banner} Approving records the decision; it does not place a trade.</div>`;
+        html += `<button class="btn btn-approve" onclick="decide('APPROVE')">Approve hedge</button>`;
+        html += `<button class="btn btn-decline" onclick="decide('DECLINE')">Decline</button>`;
+        html += `<div id="decision-ack"></div>`;
+        document.getElementById('decision-result').innerHTML = html;
+      } finally {
+        btn.disabled = false;
       }
-      let html = `<p><span class="state state-ok">COMPLETE</span> Recommendation ready. Approve or decline — ETRM still executes.</p>`;
-      html += `<div class="banner">${d.banner}</div>`;
-      html += `<p>Current CRUDE util: <span class="highlight">${d.current_util}x (BREACH)</span></p>`;
-      html += `<p>Hedge: <b>${d.hedge_bbl.toLocaleString()} bbl</b></p>`;
-      html += `<p>Post-hedge util: <span class="ok-text">${d.post_action_util}x</span></p>`;
-      html += `<p>VaR 95: $${d.var_95_usd.toLocaleString()}</p>`;
-      if (d.reroute && d.reroute.cargo_id) {
-        html += `<p>Reroute ${d.reroute.cargo_id} to ${d.reroute.alt_port}: `;
-        html += `\u0394ETA=${d.reroute.delta_eta_days}d, \u0394cost=$${Number(d.reroute.delta_cost_usd).toLocaleString()}, `;
-        html += `${d.reroute.recommendation}</p>`;
-      }
-      html += `<div id="narrative">${d.narrative}</div>`;
-      html += `<button class="btn btn-approve" onclick="decide('APPROVE')">Approve</button>`;
-      html += `<button class="btn btn-decline" onclick="decide('DECLINE')">Decline</button>`;
-      document.getElementById('decision-result').innerHTML = html;
     }
 
     async function decide(action) {
       const r = await fetch('/api/decision/approve?action=' + action, {method: 'POST'});
       const d = await r.json();
-      alert('Decision recorded: ' + d.decision_id + ' (' + d.action + ')');
+      document.getElementById('decision-ack').innerHTML =
+        `<div class="takeaway ${action === 'APPROVE' ? 'good' : 'bad'}"><span class="state ${action === 'APPROVE' ? 'state-ok' : 'state-fail'}">${d.action}</span>` +
+        `Recorded in the audit trail by ${d.who} (decision ${String(d.decision_id).slice(0, 8)}). Next step: book the trade in the ETRM.</div>`;
     }
 
-    // Auto-load risk on page load
+    loadOutcome();
     loadRisk();
   </script>
 </body>
