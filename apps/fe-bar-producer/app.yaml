@@ -1,0 +1,17 @@
+command:
+  - uvicorn
+  - main:app
+  - --host
+  - 0.0.0.0
+  - --port
+  - 8000
+
+env:
+  - name: FE_BAR_CHAIN_URL
+    value: "https://fe-bar-chain-7474658263595816.aws.databricksapps.com"
+
+resources:
+  - name: sql-warehouse
+    sql_warehouse:
+      id: "0e54af629ab8456e"
+      permission: CAN_USE

@@ -1,0 +1,28 @@
+command: ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000"]
+
+# FE Bar spike: model-chain App (M1 metocean → M2 VaR).
+# Governed data in serverless_stable_ob2uyb_catalog.fe_bar_spike.
+# Hot-path I/O via Lakebase fe-bar-lakebase / fe_bar_chain schema.
+# Auth: app SP via runtime OAuth — no PAT, no secret in this file.
+env:
+  # ── UC deploy target ─────────────────────────────────────────────────
+  - name: FE_BAR_CATALOG
+    value: "serverless_stable_ob2uyb_catalog"
+  - name: FE_BAR_SCHEMA
+    value: "fe_bar_spike"
+
+  # ── model versions (UC registry) ────────────────────────────────────
+  - name: M1_MODEL_URI
+    value: "models:/serverless_stable_ob2uyb_catalog.fe_bar_spike.m1_metocean/1"
+  - name: M2_MODEL_URI
+    value: "models:/serverless_stable_ob2uyb_catalog.fe_bar_spike.m2_var/1"
+
+  # ── Lakebase (Autoscale Postgres) ───────────────────────────────────
+  - name: LAKEBASE_ENDPOINT
+    value: "projects/fe-bar-lakebase/branches/production/endpoints/primary"
+  - name: LAKEBASE_HOST
+    value: "ep-dawn-bonus-d7iass6n.database.eu-central-1.cloud.databricks.com"
+  - name: LAKEBASE_DB
+    value: "databricks_postgres"
+  - name: LAKEBASE_SCHEMA
+    value: "fe_bar_chain"

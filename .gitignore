@@ -1,0 +1,21 @@
+.venv/
+__pycache__/
+*.pyc
+node_modules/
+dist/
+.env
+.env.*
+!.env.example
+.DS_Store
+*.parquet
+evidence/*.png
+
+# local
+.venv/
+__pycache__/
+*.pyc
+node_modules/
+.DS_Store
+.env
+.env.*
+!.env.example

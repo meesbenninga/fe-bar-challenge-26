@@ -1,0 +1,11 @@
+# FE Bar chain App — runtime deps only.
+# databricks-sdk pinned above Apps base image stale ~0.33.
+# mlflow-skinny for UC model loading without heavy Spark deps.
+databricks-sdk==0.81.0
+fastapi>=0.110
+uvicorn[standard]>=0.29
+psycopg[binary,pool]>=3.1
+mlflow[databricks]>=2.14
+scikit-learn>=1.4
+numpy>=1.26
+ray>=2.10
