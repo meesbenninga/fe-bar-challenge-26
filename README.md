@@ -2,7 +2,9 @@
 
 ## Business Outcome
 
-**Problem**: A North Sea metocean event triggers a cascade: wave disruption shortens supply cover, reprices cargo ETA, and blows the Crude VaR through the desk limit (2.11× utilisation). The desk needs a sub-5-second reprice chain, an explain-by-leg MTD P&L, and a hedge recommendation that brings utilisation back to 1.00×.
+**Accountable executives**: **Chief Risk Officer** owns the VaR limit and utilisation. **Head of Oil Trading** owns MTD P&L by leg and the hedge decision.
+
+**Problem**: A North Sea metocean event triggers a cascade: wave disruption shortens supply cover, reprices cargo ETA, and blows the Crude VaR through the desk limit (2.11× utilisation). Today that is a 45-minute rebuild while the CRO's limit is already $4.45M over. The desk needs a sub-5-second reprice chain, an explain-by-leg MTD P&L, and a hedge recommendation that brings utilisation back to 1.00×.
 
 **KPIs delivered**:
 * Reprice chain: p50=200ms, p95=249ms (4% of 5s budget)
@@ -64,15 +66,15 @@ All data is synthetic. This is an illustrative Trafigura physical-oil desk, not 
 ## Repo map
 
 - [`docs/EVIDENCE_FULL.md`](docs/EVIDENCE_FULL.md) — text execution evidence (required for the evaluator)
-- [`docs/DECK.md`](docs/DECK.md) — business-buyer slides (export to PDF for the form)
+- [`docs/DECK.md`](docs/DECK.md) — desk + CRO/CFO slides (export to PDF for the form)
 - [`docs/AI_USAGE.md`](docs/AI_USAGE.md) — how Cursor + Genie Code were used
+- [`uc/`](uc/) — Unity Catalog: views, functions, grants, row/column security
 - [`apps/`](apps/) — Databricks Apps (`fe-bar-chain`, `fe-bar-producer`, `fe-bar-oil-desk`)
 - [`pipelines/`](pipelines/) — Lakeflow SDP SQL
 - [`jobs/`](jobs/) — Lakebase→Delta history + producer notebooks
 
 ## Submit checklist
 
-1. Grant the oil-desk app SP `a3bbd7fc-6104-4ccc-b1b3-7a0def4e1710` **CAN_RUN** on Genie space `01f1c3da7f691ea7b087b1c6695bfdd3` (Genie UI; agent guardrails blocked this).
-2. Attach [`docs/DECK.md`](docs/DECK.md) (or a PDF export) on the submission form.
-3. Repo must stay **public** so the evaluator can read it.
-4. Optional: paste this Cursor conversation ID on the form.
+1. Attach [`docs/DECK.md`](docs/DECK.md) (or a PDF export) — includes the CRO/CFO investment slide.
+2. Repo must stay **public**. Unity Catalog DDL is in [`uc/`](uc/).
+3. Optional: Cursor conversation ID `58d6b572-5aaf-4a54-977b-e65753d7c7ac`.

@@ -22,13 +22,18 @@
 
 ## 2. Unity Catalog
 
-**Catalog**: serverless_stable_ob2uyb_catalog  
-**Schema**: fe_bar_spike
+**Implementation in this repo**: [`uc/`](../uc/) (schema comments, views, SQL functions, grants, row/column security, inference table).
 
-**Tables**: metocean_events, price_fx_ticks, ais_cargo, terminal_inventory, desk_positions, desk_pnl, desk_risk, http_evidence, history_model_outputs, history_run_state, history_control_metrics  
+**Catalog**: serverless_stable_ob2uyb_catalog  
+**Schema**: fe_bar_spike  
+**Owners tagged on the schema**: Chief Risk Officer (VaR/limit), Head of Oil Trading (P&L)
+
+**Tables**: metocean_events, price_fx_ticks, ais_cargo, terminal_inventory, desk_positions, desk_pnl, desk_risk, http_evidence, history_model_outputs, history_run_state, history_control_metrics, book_entitlements, decision_narrative  
 **Views**: chain_latency_mv, world_state_mv, desk_pnl_mv, desk_risk_mv  
-**Functions**: hedge_size, post_action_util, reroute_econ  
-**Models**: m1_metocean/1, m2_var/1, m3_risk/1
+**Functions**: hedge_size, post_action_util, reroute_econ, visible_sub_book, mask_entry_price  
+**Models**: m1_metocean/1, m2_var/1, m3_risk/1  
+**Row filter**: `desk_positions.visible_sub_book(sub_book)`  
+**Column mask**: `desk_positions.entry_price` via `mask_entry_price`
 
 ```sql
 SELECT serverless_stable_ob2uyb_catalog.fe_bar_spike.hedge_size('CRUDE');
@@ -129,7 +134,7 @@ Approve/Decline writes to fe_bar_chain.decision_audit with who, when, payload_ha
 
 ## BLOCKERS
 
-1. **Genie CAN_RUN grant**: Cannot programmatically grant CAN_RUN on Genie space 01f1c3da7f691ea7b087b1c6695bfdd3 to fe-bar-oil-desk SP (a3bbd7fc). Agent guardrails block permissions API mutations. **Manual action required**: grant in Genie space settings UI.
+1. **Genie CAN_RUN**: Granted in the Genie space UI to oil-desk SP `a3bbd7fc-6104-4ccc-b1b3-7a0def4e1710`. App.yaml already declares the `genie_space` resource. Verify on the live desk: Ask the desk should return an answer, not 403.
 
 2. **Ray in Apps**: Ray is installed in fe-bar-chain but parallel_after_m1 mode falls back to sequential when Ray workers cannot fork inside the App container. NS_GASOIL still runs correctly via sequential fallback. No functional impact; latency benefit deferred.
 
