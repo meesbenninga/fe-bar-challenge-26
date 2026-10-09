@@ -264,6 +264,14 @@ HTML = """
     #genie-answer { margin-top: 8px; padding: 12px; background: #1a1d27; border-radius: 4px;
                     min-height: 40px; white-space: pre-wrap; }
     .loading { color: #8ab4f8; }
+    .state { display: inline-block; padding: 4px 10px; border-radius: 4px; font-weight: 700; letter-spacing: 0.04em; font-size: 12px; }
+    .state-idle { background: #2a2d37; color: #aaa; }
+    .state-run { background: #1a3a5c; color: #8ab4f8; }
+    .state-ok { background: #14351c; color: #69f0ae; }
+    .state-fail { background: #3a1212; color: #ff8a80; }
+    .metric { margin: 8px 0; line-height: 1.45; }
+    .metric b { color: #fff; }
+    .muted { color: #888; font-size: 12px; }
   </style>
 </head>
 <body>
@@ -271,9 +279,11 @@ HTML = """
   <div class="grid">
     <div class="card" id="chain-card">
       <h2>1. Live Chain</h2>
-      <button class="btn" onclick="triggerChain()">Trigger M1→M2→M3</button>
-      <div id="chain-result"></div>
-      <div id="budget-bar"></div>
+      <p class="muted">Reprices North Sea Brent after a metocean tick. Clock starts when you press the button.</p>
+      <button class="btn" id="chain-btn" onclick="triggerChain()">Run reprice (M1 → M2 → M3)</button>
+      <div id="chain-result">
+        <p><span class="state state-idle">IDLE</span> Not started. Press the button — you will see RUNNING, then COMPLETE or FAILED.</p>
+      </div>
     </div>
     <div class="card" id="risk-card">
       <h2>2. Risk &amp; P&amp;L</h2>
@@ -296,20 +306,45 @@ HTML = """
 
   <script>
     async function triggerChain() {
-      document.getElementById('chain-result').innerHTML = '<span class="loading">Running...</span>';
-      const r = await fetch('/api/trigger');
-      const d = await r.json();
-      let html = `<p>Status: ${d.status} | Wall: ${d.wall_ms}ms | Budget: ${d.budget_ms}ms</p>`;
-      if (d.body.run_id) html += `<p>run_id: ${d.body.run_id.substring(0,12)}...</p>`;
-      if (d.body.m1) html += `<p>M1: ${d.body.m1.days_of_cover} (${d.body.m1.latency_ms}ms)</p>`;
-      if (d.body.m2) html += `<p>M2: $${d.body.m2.var_delta_usd} (${d.body.m2.latency_ms}ms)</p>`;
-      if (d.body.m3) html += `<p>M3: util=${d.body.m3.limit_util} (${d.body.m3.latency_ms}ms)</p>`;
-      html += `<p>Total: ${d.body.total_ms}ms</p>`;
-      const pct = Math.min(100, (d.body.total_ms / d.budget_ms) * 100);
-      const color = pct < 50 ? '#4caf50' : pct < 80 ? '#ffa726' : '#f44336';
-      html += `<div class="bar" style="background:#2a2d37"><div class="bar-fill" style="width:${pct}%;background:${color}"></div></div>`;
-      html += `<p>${d.body.total_ms}ms / ${d.budget_ms}ms budget (${pct.toFixed(0)}%)</p>`;
-      document.getElementById('chain-result').innerHTML = html;
+      const btn = document.getElementById('chain-btn');
+      btn.disabled = true;
+      document.getElementById('chain-result').innerHTML =
+        '<p><span class="state state-run">RUNNING</span> Calling the model chain. Not finished until you see COMPLETE.</p>';
+      try {
+        const r = await fetch('/api/trigger');
+        const d = await r.json();
+        const ok = d.status === 200 && d.body && d.body.run_id && !d.body.error;
+        if (!ok) {
+          document.getElementById('chain-result').innerHTML =
+            `<p><span class="state state-fail">FAILED</span> Chain did not complete (HTTP ${d.status}).</p>` +
+            `<p class="muted">${(d.body && (d.body.error || JSON.stringify(d.body))) || 'No body'}</p>`;
+          return;
+        }
+        const b = d.body;
+        const chainMs = b.total_ms;
+        const budget = d.budget_ms || 5000;
+        const under = chainMs < budget;
+        const m1 = b.m1 || {};
+        const m2 = b.m2 || {};
+        const m3 = b.m3 || {};
+        const pct = Math.min(100, (chainMs / budget) * 100);
+        const color = under ? '#4caf50' : '#f44336';
+        let html = `<p><span class="state state-ok">COMPLETE</span> Chain finished. North Sea Brent reprice is done.</p>`;
+        html += `<div class="metric"><b>M1 Metocean → days of cover:</b> ${Number(m1.days_of_cover).toFixed(2)} days <span class="muted">(${m1.latency_ms}ms)</span></div>`;
+        html += `<div class="metric"><b>M2 VaR delta:</b> $${Number(m2.var_delta_usd).toFixed(2)} <span class="muted">(${m2.latency_ms}ms) — model increment, not the $8.45M book VaR in panel 2</span></div>`;
+        if (m3.limit_util !== undefined) {
+          html += `<div class="metric"><b>M3 limit utilisation:</b> ${m3.limit_util}x <span class="muted">(${m3.latency_ms}ms)</span></div>`;
+        }
+        html += `<div class="metric"><b>Budget:</b> ${chainMs}ms used of ${budget}ms — ${under ? 'UNDER BUDGET' : 'OVER BUDGET'} (${pct.toFixed(0)}%)</div>`;
+        html += `<div class="bar" style="background:#2a2d37"><div class="bar-fill" style="width:${pct}%;background:${color}"></div></div>`;
+        html += `<p class="muted">Door-to-door HTTP ${d.wall_ms}ms (includes auth). Chain compute ${chainMs}ms. Run ${b.run_id}</p>`;
+        document.getElementById('chain-result').innerHTML = html;
+      } catch (e) {
+        document.getElementById('chain-result').innerHTML =
+          `<p><span class="state state-fail">FAILED</span> ${e}</p>`;
+      } finally {
+        btn.disabled = false;
+      }
     }
 
     async function loadRisk() {
@@ -346,10 +381,17 @@ HTML = """
     }
 
     async function loadDecision() {
-      document.getElementById('decision-result').innerHTML = '<span class="loading">Computing...</span>';
+      document.getElementById('decision-result').innerHTML =
+        '<p><span class="state state-run">LOADING</span> Computing hedge from UC functions, then a 3-sentence narrative. Wait for COMPLETE.</p>';
       const r = await fetch('/api/decision');
       const d = await r.json();
-      let html = `<div class="banner">${d.banner}</div>`;
+      if (d.error) {
+        document.getElementById('decision-result').innerHTML =
+          `<p><span class="state state-fail">FAILED</span> ${d.error}</p>`;
+        return;
+      }
+      let html = `<p><span class="state state-ok">COMPLETE</span> Recommendation ready. Approve or decline — ETRM still executes.</p>`;
+      html += `<div class="banner">${d.banner}</div>`;
       html += `<p>Current CRUDE util: <span class="highlight">${d.current_util}x (BREACH)</span></p>`;
       html += `<p>Hedge: <b>${d.hedge_bbl.toLocaleString()} bbl</b></p>`;
       html += `<p>Post-hedge util: <span class="ok-text">${d.post_action_util}x</span></p>`;

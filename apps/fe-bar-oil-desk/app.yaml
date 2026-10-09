@@ -17,3 +17,7 @@ resources:
     sql_warehouse:
       id: "0e54af629ab8456e"
       permission: CAN_USE
+  - name: genie-oil-desk
+    genie_space:
+      space_id: "01f1c3da7f691ea7b087b1c6695bfdd3"
+      permission: CAN_RUN
